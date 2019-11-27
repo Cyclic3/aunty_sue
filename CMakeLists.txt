@@ -14,15 +14,19 @@ project(aunty_sue VERSION 0.0.1)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 file(GLOB_RECURSE ${PROJECT_NAME}_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
-add_library(${PROJECT_NAME} ${${PROJECT_NAME}_SOURCES})
+add_executable(${PROJECT_NAME} ${${PROJECT_NAME}_SOURCES})
 
 # Begin requirements
-# @@
+find_package(Threads REQUIRED)
+#find_package(TBB REQUIRED)
+find_package(Boost REQUIRED)
 # End requirements
 
 target_link_libraries(${PROJECT_NAME}
 PUBLIC # Libraries needed to use this library
-# @@
+#TBB::tbb
+Boost::boost
+Threads::Threads
 PRIVATE # Libraries only needed to build this library
 # @@
 )
