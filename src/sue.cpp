@@ -38,7 +38,7 @@ namespace aunty_sue {
       }
     }
 
-    weight = is_white ? sum : -sum;
+    weight = is_white ? -sum : sum;
   }
 
   void sue::node_t::evaluate() {
@@ -154,20 +154,24 @@ namespace aunty_sue {
                 add_move(move_t{from, two_target});
             }
 
-            coords_t left_target = {forward_rank, file - 1};
-            if (file != 0 && (board[left_target.first][left_target.second] & enemy_mask)) {
-              if (!can_take)
-                responses.clear();
-              can_take = true;
-              add_move(move_t{from, left_target});
+            {
+              coords_t left_target = {forward_rank, file - 1};
+              if (file != 0 && (board[left_target.first][left_target.second] & enemy_mask)) {
+                if (!can_take)
+                  responses.clear();
+                can_take = true;
+                add_move(move_t{from, left_target});
+              }
             }
 
-            coords_t right_target = {forward_rank, file + 1};
-            if (file != 7 && (board[left_target.first][left_target.second] & enemy_mask)) {
-              if (!can_take)
-                responses.clear();
-              can_take = true;
-              add_move(move_t{from, right_target});
+            {
+              coords_t right_target = {forward_rank, file + 1};
+              if (file != 7 && (board[right_target.first][right_target.second] & enemy_mask)) {
+                if (!can_take)
+                  responses.clear();
+                can_take = true;
+                add_move(move_t{from, right_target});
+              }
             }
           } break;
         }

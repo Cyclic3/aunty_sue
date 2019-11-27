@@ -131,6 +131,7 @@ namespace aunty_sue {
             throw std::invalid_argument("Bad variant");
 
           out << "setup 8x8+0_suicide rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" << std::endl;
+//          out << "setup 8x8+0_suicide 8/pppppppp/8/8/8/8/PPPPPPPP/8 w - - 0 1" << std::endl;
         } break;
         case xboard_verb::ProtoVer: {
           out << "feature usermove=1" << std::endl;
