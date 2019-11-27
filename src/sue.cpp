@@ -11,19 +11,19 @@ using namespace std::chrono_literals;
 
 namespace aunty_sue {
   void sue::brain_t::stop() {
-    if (!thinking.exchange(false))
-      return;
-
     std::unique_lock lock{stopping_mutex};
-    stopping_condvar.notify_all();
+    if (thinking) {
+      thinking = false;
+      stopping_condvar.notify_all();
 
-    pool.stop();
-    pool.join();
+      pool->stop();
+      pool->join();
+    }
   }
 
   void sue::brain_t::wait() {
     std::unique_lock lock{stopping_mutex};
-    stopping_condvar.wait(lock, [this]{return thinking.load(); });
+    stopping_condvar.wait(lock, [this]{return !thinking; });
   }
 
   void sue::node_t::quick_eval() {
@@ -76,21 +76,28 @@ namespace aunty_sue {
   }
 
   void sue::node_t::process(brain_t& brain) {
+    if (brain.max_move_seen < half_moves_made) {
+      int n = half_moves_made;
+      if (brain.max_move_seen.exchange(n) != half_moves_made)
+        std::cout << "ply 0 0 " << half_moves_made << " 0" << std::endl;
+    }
+
     // Check if we understand what this state is
     if (state == game_state::NotAWin) {
       update_moves();
       state = (responses.size() == 0) ? game_state::Draw : game_state::InProgress;
     }
 
-    // We don't need to think about a finished game
-    if (state != game_state::InProgress)
-      return;
 
     // We don't need to think about a finished game
     if (state != game_state::InProgress)
       return;
 
-    // If we get here, there we are in an in-progress game
+    // We don't need to think about a finished game
+    if (state != game_state::InProgress)
+      return;
+
+    // If we get here, there we are in an in-progress gam
 
     // If we need to stop, quickly terminate
     if (!brain.thinking) // The best line of code I have ever written
@@ -105,7 +112,7 @@ namespace aunty_sue {
     // TODO: proper breadth-first seach, prioritising good moves, with a curve on depth spent
     for (auto& i : responses) {
       auto* possibility = i.second.get();
-      boost::asio::post(brain.pool, [possibility, &brain] {
+      boost::asio::post(*brain.pool, [possibility, &brain] {
         possibility->process(brain);
       });
     }
@@ -126,19 +133,14 @@ namespace aunty_sue {
         if (square & enemy_mask)
           continue;
 
-        auto m = square&enemy_mask;
-
         coords_t from = {rank, file};
         auto p = static_cast<piece_t>(square & PIECE_TYPE_MASK);
 
-
         switch (square & PIECE_TYPE_MASK) {
           case Pawn: {
-            auto str = move2str({from, from});
-            fs << std::string_view{str.data(), str.size()} << std::endl;
-
             if (rank == pawn_promote_rank)
-              abort(); // TODO
+              continue; //TODO
+//              abort(); // TODO
 
             uint8_t forward_rank = is_white ? (rank + 1) : (rank - 1);
 
@@ -148,12 +150,12 @@ namespace aunty_sue {
               add_move({from, one_target});
 
               coords_t two_target = {pawn_precomp_two_rank, file};
-              if (square & HAS_MOVED && board[two_target.first][two_target.second] == EmptySquare)
+              if (!(square & HAS_MOVED) && board[two_target.first][two_target.second] == EmptySquare)
                 add_move(move_t{from, two_target});
             }
 
             coords_t left_target = {forward_rank, file - 1};
-            if (file != 0 && board[left_target.first][left_target.second] & enemy_mask) {
+            if (file != 0 && (board[left_target.first][left_target.second] & enemy_mask)) {
               if (!can_take)
                 responses.clear();
               can_take = true;
@@ -161,7 +163,7 @@ namespace aunty_sue {
             }
 
             coords_t right_target = {forward_rank, file + 1};
-            if (file != 7 && board[left_target.first][left_target.second] & enemy_mask) {
+            if (file != 7 && (board[left_target.first][left_target.second] & enemy_mask)) {
               if (!can_take)
                 responses.clear();
               can_take = true;
@@ -176,12 +178,12 @@ namespace aunty_sue {
   std::optional<sue::node_t::thought_t> sue::node_t::find_best_response(move_t move) {
     switch(state) {
       // Check if the game is over
-      case game_state::InProgress: throw game_over{state};
+      case game_state::InProgress: break;
       //If we haven't looked into this move, we cannot find a valid, let alone good, response move
       //
       // Ask for more time
       case game_state::Unknown: return std::nullopt;
-      default: break;
+      default: throw game_over{state};
     }
 
     // Look for our move in the table
@@ -201,6 +203,7 @@ namespace aunty_sue {
     ++choice_iter;
 
     for (; choice_iter != choices.end(); ++choice_iter) {
+      auto s = choice_iter->second->state;
       switch (choice_iter->second->state) {
         case game_state::WhiteWins: {
           // If this move loses us the game, then the current best cannot be any worse
@@ -233,6 +236,10 @@ namespace aunty_sue {
             current_best = choice_iter;
         } break;
 
+        case game_state::NotAWin: {
+          return std::nullopt;
+        } break;
+
         default: throw std::logic_error{"Something terrible happened with game_state..."};
       }
     }
@@ -242,7 +249,7 @@ namespace aunty_sue {
 
   void sue::start() {
     if (brain.init())
-      boost::asio::post(brain.pool, [this] {
+      boost::asio::post(*brain.pool, [this] {
         root->process(brain);
       });
   }

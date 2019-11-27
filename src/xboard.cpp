@@ -140,7 +140,6 @@ namespace aunty_sue {
           fs << "<< [feature list]" << std::endl;
         } break;
         case xboard_verb::UserMove: {
-          eng.start();
           auto resp = move2str(eng.respond(str2move(toks.second.at(0))));
           out << "move " << std::string_view{resp.data(), resp.size()} << std::endl;
         } break;

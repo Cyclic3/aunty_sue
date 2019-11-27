@@ -15,8 +15,8 @@ namespace aunty_sue {
     constexpr std::array<char, 8> files = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
     constexpr std::array<char, 8> ranks = {'1', '2', '3', '4', '5', '6', '7', '8'};
     return {
-      files.at(move.first.first), ranks.at(move.first.second),
-      files.at(move.second.first), ranks.at(move.second.second),
+      files.at(move.first.second), ranks.at(move.first.first),
+      files.at(move.second.second), ranks.at(move.second.first),
     };
   }
 
@@ -25,8 +25,8 @@ namespace aunty_sue {
       throw std::invalid_argument("A move must be formed of 4 letters");
 
     move_t candidate = {
-      {static_cast<uint8_t>(s[0] - 'a'), static_cast<uint8_t>(s[1] - '1')},
-      {static_cast<uint8_t>(s[2] - 'a'), static_cast<uint8_t>(s[3] - '1')},
+      {static_cast<uint8_t>(s[1] - '1'), static_cast<uint8_t>(s[0] - 'a')},
+      {static_cast<uint8_t>(s[3] - '1'), static_cast<uint8_t>(s[2] - 'a')},
     };
 
     if (!validate_coords(candidate.first) || !validate_coords(candidate.second))
@@ -35,14 +35,14 @@ namespace aunty_sue {
     return candidate;
   }
 
-  enum piece_t {
+  enum piece_t : uint16_t {
     EmptySquare = 0,
-    Rook = 1, Knight = 2, Bishop = 3, Queen = 4, King = 5, Pawn = 6,
-    BLACK_SIDE = 8,
-    WHITE_SIDE = 16,
-    HAS_MOVED = 32,
+    Rook = 1, Knight = 2, Bishop = 4, Queen = 8, King = 16, Pawn = 32,
+    BLACK_SIDE = 64,
+    WHITE_SIDE = 128,
+    HAS_MOVED = 256,
 
-    PIECE_TYPE_MASK = 7
+    PIECE_TYPE_MASK = Rook|Knight|Bishop|Queen|King|Pawn
   };
 
   constexpr piece_t black(piece_t p) { return static_cast<piece_t>(BLACK_SIDE | p); }

@@ -8,6 +8,7 @@
 #include <condition_variable>
 #include <optional>
 #include <variant>
+#include <map>
 #include <mutex>
 
 #include <boost/asio/thread_pool.hpp>
@@ -18,13 +19,20 @@ namespace aunty_sue {
     using leaf_t = double;
 
     struct brain_t {
-      std::atomic<bool> thinking = false;
-      boost::asio::thread_pool pool;
+      bool thinking = false;
+      std::unique_ptr<boost::asio::thread_pool> pool = std::make_unique<boost::asio::thread_pool>();
       std::condition_variable stopping_condvar;
       std::mutex stopping_mutex;
+      std::atomic<int> max_move_seen = 0;
 
       inline bool init() {
-        return !thinking.exchange(true);
+        std::unique_lock lock{stopping_mutex};
+        if (!thinking) {
+          thinking = true;
+          pool = std::make_unique<boost::asio::thread_pool>();
+          return true;
+        }
+        else return false;
       }
       void stop();
       void wait();
@@ -36,6 +44,7 @@ namespace aunty_sue {
       board_t board;
       bool is_white;
       game_state state = game_state::Unknown;
+      int half_moves_made = 0;
 
       using thought_t = std::pair<node_t*, decltype(responses)::iterator>;
 
@@ -57,6 +66,7 @@ namespace aunty_sue {
         auto& to = node.board[m.second.first][m.second.second];
         to = static_cast<piece_t>(from | HAS_MOVED);
         from = EmptySquare;
+        node.half_moves_made = half_moves_made + 1;
       }
 
       inline node_t(decltype(board) board_, bool white_side) :
@@ -70,12 +80,15 @@ namespace aunty_sue {
     std::unique_ptr<node_t> root;
 
   public:
-    void reset() override {}
+    void reset() override {
+      stop();
+    }
     void start() override;
     void stop() override {
       brain.stop();
     }
     inline void new_game(bool is_white, board_t b) override {
+      stop();
       root = std::make_unique<node_t>(std::move(b), !is_white);
       start();
     }
