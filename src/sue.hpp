@@ -36,7 +36,7 @@ namespace aunty_sue {
 
     struct node_t {
       std::map<move_t, std::unique_ptr<node_t>> responses;
-      leaf_t weight;
+      leaf_t weight = std::numeric_limits<leaf_t>::quiet_NaN();
       board_t board;
       bool is_white;
       game_state state = game_state::Unknown;

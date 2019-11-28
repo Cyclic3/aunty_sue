@@ -8,7 +8,7 @@ namespace aunty_sue {
   using move_t = std::pair<coords_t, coords_t>;
 
   constexpr bool validate_coords(coords_t c) {
-    return c.first < 8 && c.second < 8;
+    return c.first < 8 && c.second < 8 && c.first >= 0 && c.second >= 0;
   }
 
   constexpr std::array<char, 4> move2str(move_t move) {

@@ -243,7 +243,7 @@ namespace aunty_sue {
         }
 
         if (square & PIECE_TYPE_MASK & Bishop) {
-          for (coords_t pos{from.first + 1, from.second + 1}; validate_coords(pos); ++from.first,++from.second) {
+          for (coords_t pos{from.first + 1, from.second + 1}; validate_coords(pos); ++pos.first,++pos.second) {
             auto& occupant = board[pos.first][pos.second];
             if (occupant & enemy_mask) {
               if (!can_take) {
@@ -260,7 +260,41 @@ namespace aunty_sue {
             else
               break;
           }
-          for (coords_t pos{from.first + 1, from.second - 1}; validate_coords(pos); ++from.first,--from.second) {
+          for (coords_t pos{from.first + 1, from.second - 1}; validate_coords(pos); ++pos.first,--pos.second) {
+            auto& occupant = board[pos.first][pos.second];
+            if (occupant & enemy_mask) {
+              if (!can_take) {
+                responses.clear();
+                can_take = true;
+              }
+              add_move(move_t{from, pos});
+              break;
+            }
+            else if (occupant == EmptySquare && !can_take) {
+              if (!can_take)
+                add_move(move_t{from, pos});
+            }
+            else
+              break;
+          }
+          for (coords_t pos{from.first - 1, from.second + 1}; validate_coords(pos); --pos.first,++pos.second) {
+            auto& occupant = board[pos.first][pos.second];
+            if (occupant & enemy_mask) {
+              if (!can_take) {
+                responses.clear();
+                can_take = true;
+              }
+              add_move(move_t{from, pos});
+              break;
+            }
+            else if (occupant == EmptySquare && !can_take) {
+              if (!can_take)
+                add_move(move_t{from, pos});
+            }
+            else
+              break;
+          }
+          for (coords_t pos{from.first - 1, from.second - 1}; validate_coords(pos); --pos.first,--pos.second) {
             auto& occupant = board[pos.first][pos.second];
             if (occupant & enemy_mask) {
               if (!can_take) {
