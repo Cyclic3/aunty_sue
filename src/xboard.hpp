@@ -21,7 +21,7 @@ namespace aunty_sue {
   }
 
   constexpr move_t str2move(std::string_view s) {
-    if (s.size() != 4)
+    if (s.size() < 4)
       throw std::invalid_argument("A move must be formed of 4 letters");
 
     move_t candidate = {
@@ -37,7 +37,7 @@ namespace aunty_sue {
 
   enum piece_t : uint16_t {
     EmptySquare = 0,
-    Rook = 1, Knight = 2, Bishop = 4, Queen = 8, King = 16, Pawn = 32,
+    Rook = 1, Knight = 2, Bishop = 4, Queen = Rook|Bishop, King = 16, Pawn = 32,
     BLACK_SIDE = 64,
     WHITE_SIDE = 128,
     HAS_MOVED = 256,
@@ -52,15 +52,37 @@ namespace aunty_sue {
   using board_t = std::array<row_t, 8>;
 
   constexpr board_t default_board = board_t{
-    row_t{ white(Rook), white(Knight), white(Bishop), white(King), white(Queen), white(Bishop), white(Knight), white(Rook) },
+    row_t{ white(Rook), white(Knight), white(Bishop), white(Queen), white(King), white(Bishop), white(Knight), white(Rook) },
     row_t{ white(Pawn), white(Pawn), white(Pawn), white(Pawn), white(Pawn), white(Pawn), white(Pawn), white(Pawn) },
     row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
     row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
     row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
     row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
     row_t{ black(Pawn), black(Pawn), black(Pawn), black(Pawn), black(Pawn), black(Pawn), black(Pawn), black(Pawn) },
-    row_t{ black(Rook), black(Knight), black(Bishop), black(King), black(Queen), black(Bishop), black(Knight), black(Rook) },
+    row_t{ black(Rook), black(Knight), black(Bishop), black(Queen), black(King), black(Bishop), black(Knight), black(Rook) },
   };
+
+//  constexpr board_t default_board = board_t{
+//    row_t{ white(Queen), white(Queen), white(Queen), white(Queen), white(Queen), white(Queen), white(Queen), white(Queen) },
+//    row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
+//    row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
+//    row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
+//    row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
+//    row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
+//    row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
+//    row_t{ black(Queen), black(Queen), black(Queen), black(Queen), black(Queen), black(Queen), black(Queen), black(Queen) },
+//  };
+
+//  constexpr board_t default_board = board_t{
+//    row_t{ white(Queen), white(Queen), white(Queen), EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
+//    row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
+//    row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
+//    row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
+//    row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
+//    row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
+//    row_t{ EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
+//    row_t{ black(Queen), black(Queen), black(Queen), EmptySquare, EmptySquare, EmptySquare, EmptySquare, EmptySquare },
+//  };
 
   enum class game_state {
     BlackWins,
@@ -129,6 +151,4 @@ namespace aunty_sue {
   };
 
   void run_engine(XBoardEngine& eng, std::istream& in = std::cin, std::ostream& out = std::cout);
-
-  extern std::ofstream fs;
 }

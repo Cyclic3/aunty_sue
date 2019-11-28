@@ -11,19 +11,10 @@ using namespace std::chrono_literals;
 
 namespace aunty_sue {
   void sue::brain_t::stop() {
-    std::unique_lock lock{stopping_mutex};
-    if (thinking) {
-      thinking = false;
-      stopping_condvar.notify_all();
-
+    if (thinking.exchange(false)) {
       pool->stop();
       pool->join();
     }
-  }
-
-  void sue::brain_t::wait() {
-    std::unique_lock lock{stopping_mutex};
-    stopping_condvar.wait(lock, [this]{return !thinking; });
   }
 
   void sue::node_t::quick_eval() {
@@ -41,53 +32,55 @@ namespace aunty_sue {
     weight = is_white ? -sum : sum;
   }
 
-  void sue::node_t::evaluate() {
+  void sue::node_t::evaluate(brain_t& brain, bool top) {
     switch (state) {
       case game_state::Draw: {
         weight = 0;
-      } return;
+      } break;
       case game_state::WhiteWins: {
         weight = is_white ?
               std::numeric_limits<leaf_t>::infinity() :
               -std::numeric_limits<leaf_t>::infinity();
-      } return;
+      } break;
       case game_state::BlackWins: {
         weight = is_white ?
               -std::numeric_limits<leaf_t>::infinity() :
               std::numeric_limits<leaf_t>::infinity();
-      } return;
+      } break;
       case game_state::InProgress: {
-        // Clear any previous weight calculation
-        weight = 0;
+        weight = -std::numeric_limits<leaf_t>::infinity();
 
         for (auto& i : responses) {
-          i.second->evaluate();
+          i.second->evaluate(brain);
           // Subtract, as we don't want them to win!
           //
           // I have messed this up before, to hilarious effect
-          weight -= i.second->weight;
+          if (i.second->weight > weight)
+            weight = i.second->weight;
         }
+        weight = -weight;
       } break;
       // If we have no idea what is going on, perform a quick eval, and return
       default: {
         quick_eval();
-      } return;
+      } break;
     }
+
+
+    if (brain.max_move_seen < half_moves_made)
+      brain.max_move_seen.exchange(half_moves_made);
+    if (top)
+      std::cout << ' ' << brain.max_move_seen << ' ' << weight * 100 << " 0 0 help me" << std::endl;
+
+//
   }
 
   void sue::node_t::process(brain_t& brain) {
-    if (brain.max_move_seen < half_moves_made) {
-      int n = half_moves_made;
-      if (brain.max_move_seen.exchange(n) != half_moves_made)
-        std::cout << "ply 0 0 " << half_moves_made << " 0" << std::endl;
-    }
-
     // Check if we understand what this state is
     if (state == game_state::NotAWin) {
       update_moves();
       state = (responses.size() == 0) ? game_state::Draw : game_state::InProgress;
     }
-
 
     // We don't need to think about a finished game
     if (state != game_state::InProgress)
@@ -119,8 +112,8 @@ namespace aunty_sue {
   }
 
   void sue::node_t::update_moves() {
-    auto side_mask = is_white ? WHITE_SIDE : BLACK_SIDE;
-    auto enemy_mask = is_white ? BLACK_SIDE : WHITE_SIDE;
+    piece_t side_mask = is_white ? WHITE_SIDE : BLACK_SIDE;
+    piece_t enemy_mask = is_white ? BLACK_SIDE : WHITE_SIDE;
 
     int8_t pawn_promote_rank = is_white ? (8 - 1) : (1 - 1);
     int8_t pawn_precomp_two_rank = is_white ? (4 - 1) : (5 - 1);
@@ -136,44 +129,154 @@ namespace aunty_sue {
         coords_t from = {rank, file};
         auto p = static_cast<piece_t>(square & PIECE_TYPE_MASK);
 
-        switch (square & PIECE_TYPE_MASK) {
-          case Pawn: {
-            if (rank == pawn_promote_rank)
-              continue; //TODO
+        if (square & PIECE_TYPE_MASK & Pawn) {
+          if (rank == pawn_promote_rank)
+            continue; //TODO
 //              abort(); // TODO
 
-            uint8_t forward_rank = is_white ? (rank + 1) : (rank - 1);
+          int8_t forward_rank = is_white ? (rank + 1) : (rank - 1);
 
-            coords_t one_target = {forward_rank, file};
-            // If we can't move one, we can't move two
-            if (!can_take && board[one_target.first][one_target.second] == EmptySquare) {
-              add_move({from, one_target});
+          coords_t one_target = {forward_rank, file};
+          // If we can't move one, we can't move two
+          if (!can_take && board[one_target.first][one_target.second] == EmptySquare) {
+            add_move({from, one_target});
 
-              coords_t two_target = {pawn_precomp_two_rank, file};
-              if (!(square & HAS_MOVED) && board[two_target.first][two_target.second] == EmptySquare)
-                add_move(move_t{from, two_target});
-            }
+            coords_t two_target = {pawn_precomp_two_rank, file};
+            if (!(square & HAS_MOVED) && board[two_target.first][two_target.second] == EmptySquare)
+              add_move(move_t{from, two_target});
+          }
 
-            {
-              coords_t left_target = {forward_rank, file - 1};
-              if (file != 0 && (board[left_target.first][left_target.second] & enemy_mask)) {
-                if (!can_take)
-                  responses.clear();
+          {
+            coords_t left_target = {forward_rank, file - 1};
+            if (file != 0 && (board[left_target.first][left_target.second] & enemy_mask)) {
+              if (!can_take) {
+                responses.clear();
                 can_take = true;
-                add_move(move_t{from, left_target});
               }
+              add_move(move_t{from, left_target});
             }
+          }
 
-            {
-              coords_t right_target = {forward_rank, file + 1};
-              if (file != 7 && (board[right_target.first][right_target.second] & enemy_mask)) {
-                if (!can_take)
-                  responses.clear();
+          {
+            coords_t right_target = {forward_rank, file + 1};
+            if (file != 7 && (board[right_target.first][right_target.second] & enemy_mask)) {
+              if (!can_take) {
+                responses.clear();
                 can_take = true;
-                add_move(move_t{from, right_target});
               }
+              add_move(move_t{from, right_target});
             }
-          } break;
+          }
+
+          continue;
+        }
+
+        if (square & PIECE_TYPE_MASK & Rook) {
+          for (int8_t target_rank = rank - 1; target_rank >= 0; --target_rank) {
+            auto& occupant = board[target_rank][file];
+            if (occupant & enemy_mask) {
+              if (!can_take) {
+                responses.clear();
+                can_take = true;
+              }
+              add_move(move_t{from, {target_rank, file}});
+              break;
+            }
+            else if (occupant == EmptySquare && !can_take) {
+              if (!can_take)
+                add_move(move_t{from, {target_rank, file}});
+            }
+            else
+              break;
+          }
+          for (int8_t target_rank = rank + 1; target_rank <= 7; ++target_rank) {
+            auto& occupant = board[target_rank][file];
+            if (occupant & enemy_mask) {
+              if (!can_take) {
+                responses.clear();
+                can_take = true;
+              }
+              add_move(move_t{from, {target_rank, file}});
+              break;
+            }
+            else if (occupant == EmptySquare && !can_take) {
+              if (!can_take)
+                add_move(move_t{from, {target_rank, file}});
+            }
+            else
+              break;
+          }
+          for (int8_t target_file = file - 1; target_file >= 0; --target_file) {
+            auto& occupant = board[rank][target_file];
+            if (occupant & enemy_mask) {
+              if (!can_take) {
+                responses.clear();
+                can_take = true;
+              }
+              add_move(move_t{from, {rank, target_file}});
+              break;
+            }
+            else if (occupant == EmptySquare && !can_take) {
+              if (!can_take)
+                 add_move(move_t{from, {rank, target_file}});
+            }
+            else
+              break;
+          }
+          for (int8_t target_file = file + 1; target_file <= 7; ++target_file) {
+            auto& occupant = board[rank][target_file];
+            if (occupant & enemy_mask) {
+              if (!can_take) {
+                responses.clear();
+                can_take = true;
+              }
+              add_move(move_t{from, {rank, target_file}});
+              break;
+            }
+            else if (occupant == EmptySquare && !can_take) {
+              if (!can_take)
+                add_move(move_t{from, {rank, target_file}});
+            }
+            else
+              break;
+          }
+        }
+
+        if (square & PIECE_TYPE_MASK & Bishop) {
+          for (coords_t pos{from.first + 1, from.second + 1}; validate_coords(pos); ++from.first,++from.second) {
+            auto& occupant = board[pos.first][pos.second];
+            if (occupant & enemy_mask) {
+              if (!can_take) {
+                responses.clear();
+                can_take = true;
+              }
+              add_move(move_t{from, pos});
+              break;
+            }
+            else if (occupant == EmptySquare && !can_take) {
+              if (!can_take)
+                add_move(move_t{from, pos});
+            }
+            else
+              break;
+          }
+          for (coords_t pos{from.first + 1, from.second - 1}; validate_coords(pos); ++from.first,--from.second) {
+            auto& occupant = board[pos.first][pos.second];
+            if (occupant & enemy_mask) {
+              if (!can_take) {
+                responses.clear();
+                can_take = true;
+              }
+              add_move(move_t{from, pos});
+              break;
+            }
+            else if (occupant == EmptySquare && !can_take) {
+              if (!can_take)
+                add_move(move_t{from, pos});
+            }
+            else
+              break;
+          }
         }
       }
     }
@@ -207,7 +310,6 @@ namespace aunty_sue {
     ++choice_iter;
 
     for (; choice_iter != choices.end(); ++choice_iter) {
-      auto s = choice_iter->second->state;
       switch (choice_iter->second->state) {
         case game_state::WhiteWins: {
           // If this move loses us the game, then the current best cannot be any worse
@@ -236,7 +338,7 @@ namespace aunty_sue {
           //
           // As such, this comparison will return false for a NaN,
           // meaning that we skip any uncomputed state
-          if (current_best->second->weight < choice_iter->second->weight)
+          if (current_best->second->weight > choice_iter->second->weight)
             current_best = choice_iter;
         } break;
 
@@ -261,6 +363,7 @@ namespace aunty_sue {
   move_t sue::respond(move_t move) {
     stop();
     std::optional<sue::node_t::thought_t> res;
+    root->evaluate(brain, true);
     while (!(res = root->find_best_response(move))) {
       // Give it another chance
       start();

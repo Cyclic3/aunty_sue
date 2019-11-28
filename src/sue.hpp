@@ -19,16 +19,12 @@ namespace aunty_sue {
     using leaf_t = double;
 
     struct brain_t {
-      bool thinking = false;
+      std::atomic<bool> thinking = false;
       std::unique_ptr<boost::asio::thread_pool> pool = std::make_unique<boost::asio::thread_pool>();
-      std::condition_variable stopping_condvar;
-      std::mutex stopping_mutex;
       std::atomic<int> max_move_seen = 0;
 
       inline bool init() {
-        std::unique_lock lock{stopping_mutex};
-        if (!thinking) {
-          thinking = true;
+        if (!thinking.exchange(true)) {
           pool = std::make_unique<boost::asio::thread_pool>();
           return true;
         }
@@ -58,7 +54,7 @@ namespace aunty_sue {
 
       void quick_eval();
       void process(brain_t& brain);
-      void evaluate();
+      void evaluate(brain_t& brain, bool top = false);
 
       inline void add_move(move_t m) {
         auto& node = *responses.emplace(m, std::make_unique<node_t>(board, !is_white)).first->second;

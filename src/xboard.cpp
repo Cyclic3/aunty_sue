@@ -1,5 +1,7 @@
 #include "xboard.hpp"
 
+#include <signal.h>
+
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -101,18 +103,14 @@ namespace aunty_sue {
     return ret;
   }
 
-  std::ofstream fs;
-
   void run_engine(XBoardEngine& eng, std::istream& in, std::ostream& out) {
+    signal(SIGINT, SIG_IGN);
+
     std::string line;
 
     std::filesystem::remove("/tmp/aunty_sue.log");
 
     while (std::getline(in, line)) {
-      fs = std::ofstream{"/tmp/aunty_sue.log", std::fstream::app};
-      fs << ">> " << line << std::endl;
-      fs.flush();
-
       auto toks = parse_line(line);
 
       switch (toks.first) {
@@ -138,7 +136,6 @@ namespace aunty_sue {
           out << "feature time=0" << std::endl;
           out << "feature variants=\"auntysue\"" << std::endl;
           out << "feature done=1" << std::endl;
-          fs << "<< [feature list]" << std::endl;
         } break;
         case xboard_verb::UserMove: {
           auto resp = move2str(eng.respond(str2move(toks.second.at(0))));
